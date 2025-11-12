@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header-title {
+            text-align: center;
+            color: white;
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .card-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        
+        .card-header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        
+        .card-header .symbol {
+            color: #666;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        .price {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        
+        .price-value {
+            font-size: 42px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        
+        .price-change {
+            font-size: 22px;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+        
+        .price-change.positive {
+            color: #10b981;
+            background: #d1fae5;
+        }
+        
+        .price-change.negative {
+            color: #ef4444;
+            background: #fee2e2;
+        }
+        
+        .info-grid {
+            display: grid;
+            gap: 15px;
+            margin-top: 25px;
+        }
+        
+        .info-item {
+            background: #f8f9fa;
+            padding: 18px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .info-label {
+            color: #666;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .info-value {
+            color: #333;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .info-value.high {
+            color: #10b981;
+        }
+        
+        .info-value.low {
+            color: #ef4444;
+        }
+        
+        .last-update {
+            text-align: center;
+            margin-top: 20px;
+            color: white;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            font-size: 16px;
+            padding: 20px;
+        }
+        
+        .error {
+            text-align: center;
+            color: #ef4444;
+            font-size: 14px;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="header-title">📊 Market Dashboard</h1>
+        
+        <div class="cards-grid" id="cards-container">
+            <div class="card">
+                <div class="loading">데이터 로딩 중...</div>
+            </div>
+        </div>
+        
+        <div class="last-update" id="last-update"></div>
+    </div>
+    
+    <script>
+        const ASSETS = [
+            { id: 'BTC', name: 'Bitcoin', icon: '₿', coinId: 'bitcoin', type: 'crypto' },
+            { id: 'ETH', name: 'Ethereum', icon: 'Ξ', coinId: 'ethereum', type: 'crypto' },
+            { id: 'QQQ', name: 'QQQ (Nasdaq 100)', icon: '📈', symbol: 'QQQ', type: 'stock' },
+            { id: 'SPY', name: 'SPY (S&P 500)', icon: '📊', symbol: 'SPY', type: 'stock' }
+        ];
+        
+        function formatNumber(num) {
+            return new Intl.NumberFormat('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(num);
+        }
+        
+        function formatPercent(num) {
+            const sign = num >= 0 ? '+' : '';
+            return sign + num.toFixed(2) + '%';
+        }
+        
+        function renderCard(asset, data) {
+            if (data.error) {
+                return `
+                    <div class="card">
+                        <div class="card-header">
+                            <h1>${asset.icon} ${asset.name}</h1>
+                            <div class="symbol">${asset.id}</div>
+                        </div>
+                        <div class="error">${data.error}</div>
+                    </div>
+                `;
+            }
+            
+            const change24h = data.change_24h;
+            const changeFromAth = data.change_from_ath;
+            const isPositive = change24h >= 0;
+            const hasAth = data.ath_price && data.ath_price > 0;
+            
+            return `
+                <div class="card">
+                    <div class="card-header">
+                        <h1>${asset.icon} ${asset.name}</h1>
+                        <div class="symbol">${asset.id}</div>
+                    </div>
+                    
+                    <div class="price">
+                        <div class="price-value">$${formatNumber(data.current_price)}</div>
+                        <div class="price-change ${isPositive ? 'positive' : 'negative'}">
+                            ${formatPercent(change24h)}
+                        </div>
+                    </div>
+                    
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">오늘 등락률</span>
+                            <span class="info-value ${isPositive ? 'high' : 'low'}">
+                                ${formatPercent(change24h)}
+                            </span>
+                        </div>
+                        ${hasAth ? `
+                        <div class="info-item">
+                            <span class="info-label">전고점 (ATH)</span>
+                            <span class="info-value high">$${formatNumber(data.ath_price)}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">전고점 대비 하락률</span>
+                            <span class="info-value low">
+                                ${formatPercent(changeFromAth)}
+                            </span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        async function getCryptoData(coinId) {
+            try {
+                const url = `https://api.coingecko.com/api/v3/coins/${coinId}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`;
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const marketData = data.market_data;
+                
+                const currentPrice = marketData.current_price.usd;
+                const change24h = marketData.price_change_percentage_24h || 0;
+                const athPrice = marketData.ath.usd;
+                const changeFromAth = ((currentPrice - athPrice) / athPrice) * 100;
+                
+                return {
+                    current_price: currentPrice,
+                    change_24h: change24h,
+                    ath_price: athPrice,
+                    change_from_ath: changeFromAth,
+                    last_update: new Date().toLocaleString('ko-KR')
+                };
+            } catch (error) {
+                return {
+                    error: `데이터를 불러올 수 없습니다: ${error.message}`,
+                    current_price: 0,
+                    change_24h: 0,
+                    ath_price: 0,
+                    change_from_ath: 0,
+                    last_update: new Date().toLocaleString('ko-KR')
+                };
+            }
+        }
+        
+        async function getStockData(symbol) {
+            // CORS 프록시를 통해 Yahoo Finance API 호출
+            try {
+                const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1mo`;
+                // CORS 프록시 사용
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrl)}`;
+                const response = await fetch(proxyUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const proxyData = await response.json();
+                const data = JSON.parse(proxyData.contents);
+                
+                if (!data.chart || !data.chart.result || data.chart.result.length === 0) {
+                    throw new Error('데이터 형식 오류');
+                }
+                
+                const result = data.chart.result[0];
+                const meta = result.meta;
+                
+                const currentPrice = meta.regularMarketPrice;
+                const previousClose = meta.previousClose || currentPrice;
+                const change24h = ((currentPrice - previousClose) / previousClose) * 100;
+                
+                // 52주 고점을 전고점으로 사용
+                const athPrice = meta.fiftyTwoWeekHigh || currentPrice;
+                const changeFromAth = ((currentPrice - athPrice) / athPrice) * 100;
+                
+                return {
+                    current_price: currentPrice,
+                    change_24h: change24h,
+                    ath_price: athPrice,
+                    change_from_ath: changeFromAth,
+                    last_update: new Date().toLocaleString('ko-KR')
+                };
+            } catch (error) {
+                // 다른 CORS 프록시 시도
+                try {
+                    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1mo`;
+                    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`;
+                    const response = await fetch(proxyUrl);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        if (data.chart && data.chart.result && data.chart.result.length > 0) {
+                            const result = data.chart.result[0];
+                            const meta = result.meta;
+                            
+                            const currentPrice = meta.regularMarketPrice;
+                            const previousClose = meta.previousClose || currentPrice;
+                            const change24h = ((currentPrice - previousClose) / previousClose) * 100;
+                            const athPrice = meta.fiftyTwoWeekHigh || currentPrice;
+                            const changeFromAth = ((currentPrice - athPrice) / athPrice) * 100;
+                            
+                            return {
+                                current_price: currentPrice,
+                                change_24h: change24h,
+                                ath_price: athPrice,
+                                change_from_ath: changeFromAth,
+                                last_update: new Date().toLocaleString('ko-KR')
+                            };
+                        }
+                    }
+                } catch (altError) {
+                    // 모든 방법 실패
+                }
+                
+                return {
+                    error: `데이터를 불러올 수 없습니다: ${error.message}`,
+                    current_price: 0,
+                    change_24h: 0,
+                    ath_price: 0,
+                    change_from_ath: 0,
+                    last_update: new Date().toLocaleString('ko-KR')
+                };
+            }
+        }
+        
+        async function updateData() {
+            const promises = ASSETS.map(async (asset) => {
+                let data;
+                if (asset.type === 'crypto') {
+                    data = await getCryptoData(asset.coinId);
+                } else if (asset.type === 'stock') {
+                    data = await getStockData(asset.symbol);
+                } else {
+                    data = { error: '알 수 없는 자산 타입' };
+                }
+                return { asset, data };
+            });
+            
+            const results = await Promise.all(promises);
+            const container = document.getElementById('cards-container');
+            container.innerHTML = results.map(({ asset, data }) => renderCard(asset, data)).join('');
+            
+            const lastUpdate = results[0]?.data?.last_update || '';
+            if (lastUpdate) {
+                document.getElementById('last-update').textContent = 
+                    `마지막 업데이트: ${lastUpdate}`;
+            }
+        }
+        
+        // 초기 로드
+        updateData();
+        
+        // 30초마다 자동 업데이트
+        setInterval(updateData, 30000);
+    </script>
+</body>
+</html>
+
