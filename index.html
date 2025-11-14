@@ -34,7 +34,7 @@
         
         .cards-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 25px;
             margin-bottom: 20px;
         }
@@ -172,17 +172,31 @@
     
     <script>
         const ASSETS = [
-            { id: 'BTC', name: 'Bitcoin', icon: '₿', coinId: 'bitcoin', type: 'crypto' },
-            { id: 'ETH', name: 'Ethereum', icon: 'Ξ', coinId: 'ethereum', type: 'crypto' },
-            { id: 'QQQ', name: 'QQQ (Nasdaq 100)', icon: '📈', symbol: 'QQQ', type: 'stock' },
-            { id: 'SPY', name: 'SPY (S&P 500)', icon: '📊', symbol: 'SPY', type: 'stock' }
+            { id: 'BTC', name: 'Bitcoin', icon: '₿', coinId: 'bitcoin', type: 'crypto', currency: 'USD' },
+            { id: 'ETH', name: 'Ethereum', icon: 'Ξ', coinId: 'ethereum', type: 'crypto', currency: 'USD' },
+            { id: 'QQQ', name: 'QQQ (Nasdaq 100)', icon: '📈', symbol: 'QQQ', type: 'stock', currency: 'USD' },
+            { id: 'TQQQ', name: 'TQQQ (3x Nasdaq)', icon: '🚀', symbol: 'TQQQ', type: 'stock', currency: 'USD' },
+            { id: 'SPY', name: 'SPY (S&P 500)', icon: '📊', symbol: 'SPY', type: 'stock', currency: 'USD' },
+            { id: 'KOSPI', name: 'KOSPI', icon: '🇰🇷', symbol: '^KS11', type: 'stock', currency: 'KRW' },
+            { id: 'KOSDAQ', name: 'KOSDAQ', icon: '🇰🇷', symbol: '^KQ11', type: 'stock', currency: 'KRW' }
         ];
         
-        function formatNumber(num) {
-            return new Intl.NumberFormat('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }).format(num);
+        function formatNumber(num, currency = 'USD') {
+            if (currency === 'KRW') {
+                return new Intl.NumberFormat('ko-KR', {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }).format(num);
+            } else {
+                return new Intl.NumberFormat('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }).format(num);
+            }
+        }
+        
+        function getCurrencySymbol(currency) {
+            return currency === 'KRW' ? '₩' : '$';
         }
         
         function formatPercent(num) {
@@ -208,6 +222,9 @@
             const isPositive = change24h >= 0;
             const hasAth = data.ath_price && data.ath_price > 0;
             
+            const currency = asset.currency || 'USD';
+            const currencySymbol = getCurrencySymbol(currency);
+            
             return `
                 <div class="card">
                     <div class="card-header">
@@ -216,7 +233,7 @@
                     </div>
                     
                     <div class="price">
-                        <div class="price-value">$${formatNumber(data.current_price)}</div>
+                        <div class="price-value">${currencySymbol}${formatNumber(data.current_price, currency)}</div>
                         <div class="price-change ${isPositive ? 'positive' : 'negative'}">
                             ${formatPercent(change24h)}
                         </div>
@@ -232,7 +249,7 @@
                         ${hasAth ? `
                         <div class="info-item">
                             <span class="info-label">전고점 (ATH)</span>
-                            <span class="info-value high">$${formatNumber(data.ath_price)}</span>
+                            <span class="info-value high">${currencySymbol}${formatNumber(data.ath_price, currency)}</span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">전고점 대비 하락률</span>
